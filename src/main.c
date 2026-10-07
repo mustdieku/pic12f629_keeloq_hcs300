@@ -173,12 +173,9 @@ static void io_init(void) {
 void main(void) {
     static uint8_t state;
     static uint8_t candidate;
-    static uint8_t debounced;
-    static uint16_t counter;
 
     io_init();
     eeprom_store_init(INITIAL_COUNTER);
-    counter = eeprom_store_get();
 
     for(;;) {
         candidate = read_buttons();
@@ -192,7 +189,7 @@ void main(void) {
                  * status bit changes for subsequent code words.
                  */
                 GPIO |= LED_MASK;
-                send_word(state, counter, 1U);
+                send_word(state, eeprom_store_get(), 1U);
             } else {
                 GPIO &= (uint8_t)~LED_MASK;
                 __delay_ms(5);
@@ -202,10 +199,9 @@ void main(void) {
         }
 
         /* Ignore short button transitions caused by mechanical bounce. */
-        debounced = debounce_buttons(candidate);
-        if(debounced == 0xFFU) continue;
+        candidate = debounce_buttons(candidate);
+        if(candidate == 0xFFU) continue;
 
-        candidate = debounced;
         if(candidate == state) continue;
 
         if(candidate == 0) {
@@ -232,14 +228,13 @@ void main(void) {
          *
          * A release never increments the counter.
          */
-        counter = (uint16_t)(counter + 1U);
-
         /*
          * Commit the new counter before transmitting it. If the EEPROM
          * write cannot be verified, do not transmit a code that may be
          * lost across a power failure.
          */
-        if(!eeprom_store_commit(counter)) {
+        if(!eeprom_store_commit(
+                (uint16_t)(eeprom_store_get() + 1U))) {
             GPIO &= (uint8_t)~LED_MASK;
             state = 0;
             continue;
@@ -250,6 +245,6 @@ void main(void) {
         GPIO |= LED_MASK;
 
         /* First code word after a state transition: RPT = 0. */
-        send_word(state, counter, 0U);
+        send_word(state, eeprom_store_get(), 0U);
     }
 }
