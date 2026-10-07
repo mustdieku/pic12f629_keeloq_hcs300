@@ -1,0 +1,1 @@
+Create a new MPLAB X / XC8 project for PIC12F629 and add all files from src/. The source contains device configuration pragmas and is ready for XC8. The Makefile is a command-line convenience build; exact XC8 command-line syntax varies between XC8 major releases.
