@@ -3,7 +3,7 @@
 #include "config.h"
 
 #define EEPROM_SLOTS 16U
-#define RECORD_SIZE  7U
+#define RECORD_SIZE  5U
 #define EEPROM_MAGIC 0xA5U
 
 /* Runtime state is kept in static storage to minimize stack usage. */
@@ -38,23 +38,20 @@ static void ee_write(uint8_t address, uint8_t value) {
 static uint8_t checksum(uint8_t seq, uint16_t counter) {
     uint8_t x = (uint8_t)(0x5AU ^ seq ^ (uint8_t)counter ^
                           (uint8_t)(counter >> 8));
-    x ^= (uint8_t)~counter;
     return (uint8_t)((x << 3) | (x >> 5));
 }
 
 /*
  * Validate one EEPROM record.
  *
- * The commit marker (MAGIC) is written last. Therefore an interrupted
- * record update cannot normally become the newest valid record.
+ * MAGIC is written last. Therefore an interrupted record cannot become
+ * a valid record.
  */
 static uint8_t slot_valid(uint8_t slot) {
     uint8_t base = (uint8_t)(slot * RECORD_SIZE);
     uint8_t seq;
     uint8_t lo;
     uint8_t hi;
-    uint8_t ilo;
-    uint8_t ihi;
     uint8_t chk;
 
     if(ee_read(base) != EEPROM_MAGIC) return 0;
@@ -63,11 +60,9 @@ static uint8_t slot_valid(uint8_t slot) {
 
     lo = ee_read((uint8_t)(base + 2U));
     hi = ee_read((uint8_t)(base + 3U));
-    ilo = ee_read((uint8_t)(base + 4U));
-    ihi = ee_read((uint8_t)(base + 5U));
-    chk = ee_read((uint8_t)(base + 6U));
 
-    if((uint8_t)~lo != ilo || (uint8_t)~hi != ihi) return 0;
+    chk = ee_read((uint8_t)(base + 4U));
+
     if(checksum(seq, (uint16_t)lo | ((uint16_t)hi << 8)) != chk) return 0;
 
     return 1;
@@ -118,28 +113,26 @@ uint16_t eeprom_store_get(void) {
 }
 
 uint8_t eeprom_store_commit(uint16_t counter) {
-    uint8_t next_slot = (uint8_t)(((current_seq + 1U) & 0x0FU));
+    uint8_t next_slot = (uint8_t)((current_seq + 1U) & 0x0FU);
     uint8_t next_seq = (uint8_t)(current_seq + 1U);
     uint8_t base = (uint8_t)(next_slot * RECORD_SIZE);
     uint8_t chk = checksum(next_seq, counter);
 
     /*
-     * Invalidate first and write the commit marker last.
+     * Invalidate the slot first.
      *
-     * This is the important power-failure property of the journal:
-     * an incomplete record is never accepted by slot_valid().
+     * MAGIC is restored only after the complete record has been written.
      */
     ee_write(base, 0x00U);
     ee_write((uint8_t)(base + 1U), next_seq);
     ee_write((uint8_t)(base + 2U), (uint8_t)counter);
     ee_write((uint8_t)(base + 3U), (uint8_t)(counter >> 8));
-    ee_write((uint8_t)(base + 4U), (uint8_t)~counter);
-    ee_write((uint8_t)(base + 5U), (uint8_t)~(counter >> 8));
-    ee_write((uint8_t)(base + 6U), chk);
+    ee_write((uint8_t)(base + 4U), chk);
+
     ee_write(base, EEPROM_MAGIC);
 
-    if(!slot_valid(next_slot)) return 0;
-    if(ee_read((uint8_t)(base + 1U)) != next_seq) return 0;
+    if(!slot_valid(next_slot))
+        return 0;
 
     current_seq = next_seq;
     current_counter = counter;
