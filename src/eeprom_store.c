@@ -11,7 +11,6 @@ static uint8_t current_seq;
 static uint16_t current_counter;
 
 static uint8_t ee_read(uint8_t address) {
-    EECON1bits.EEPGD = 0;
     EEADR = address;
     EECON1bits.RD = 1;
     return EEDATA;
@@ -22,7 +21,6 @@ static void ee_write(uint8_t address, uint8_t value) {
 
     while(EECON1bits.WR) { }
 
-    EECON1bits.EEPGD = 0;
     EEADR = address;
     EEDATA = value;
     EECON1bits.WREN = 1;
