@@ -171,10 +171,10 @@ static void io_init(void) {
 }
 
 void main(void) {
-    uint8_t state = 0;
-    uint8_t candidate;
-    uint8_t debounced;
-    uint16_t counter;
+    static uint8_t state;
+    static uint8_t candidate;
+    static uint8_t debounced;
+    static uint16_t counter;
 
     io_init();
     eeprom_store_init(INITIAL_COUNTER);
