@@ -68,17 +68,3 @@ uint32_t keeloq_encrypt(uint32_t data) {
 
     return x;
 }
-
-void keeloq_normal_learning(uint32_t serial, uint32_t manufacturer_lo,
-                            uint32_t manufacturer_hi) {
-    /*
-     * Normal learning is performed offline because the manufacturer code
-     * and serial number are compile-time constants.
-     *
-     * Keep this function for API compatibility with the transmitter code.
-     * No RAM is allocated and no runtime calculation is performed.
-     */
-    (void)serial;
-    (void)manufacturer_lo;
-    (void)manufacturer_hi;
-}
