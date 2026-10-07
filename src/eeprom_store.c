@@ -6,8 +6,7 @@
 #define RECORD_SIZE  5U
 #define EEPROM_MAGIC 0xA5U
 
-/* Runtime state is kept in static storage to minimize stack usage. */
-static uint8_t current_seq;
+/* Only the current counter has to remain in RAM. */
 static uint16_t current_counter;
 
 static uint8_t ee_read(uint8_t address) {
@@ -68,41 +67,40 @@ static uint8_t slot_valid(uint8_t slot) {
     return 1;
 }
 
-/*
- * Compare 8-bit sequence numbers with wrap-around.
- *
- * This remains valid as long as the distance between two valid sequence
- * numbers is less than 128.
- */
-static uint8_t seq_newer(uint8_t a, uint8_t b) {
-    return (uint8_t)((int8_t)(a - b) > 0);
+/* Compare 16-bit counters with wrap-around. */
+static uint8_t counter_newer(uint16_t a, uint16_t b) {
+    return (uint8_t)((int16_t)(a - b) > 0);
 }
 
 void eeprom_store_init(uint16_t initial_counter) {
     uint8_t i;
-    uint8_t seq;
-    uint8_t best_seq = 0;
+    uint16_t counter;
+    uint16_t best_counter = 0;
     uint8_t best_slot = 0;
     uint8_t found = 0;
     uint8_t lo;
     uint8_t hi;
 
     for(i = 0; i < EEPROM_SLOTS; ++i) {
-        seq = ee_read((uint8_t)(i * RECORD_SIZE + 1U));
-        if(slot_valid(i) && (!found || seq_newer(seq, best_seq))) {
+        if(!slot_valid(i))
+            continue;
+
+        lo = ee_read((uint8_t)(i * RECORD_SIZE + 2U));
+        hi = ee_read((uint8_t)(i * RECORD_SIZE + 3U));
+        counter = (uint16_t)lo | ((uint16_t)hi << 8);
+
+        if(!found || counter_newer(counter, best_counter)) {
             found = 1;
-            best_seq = seq;
+            best_counter = counter;
             best_slot = i;
         }
     }
 
     if(found) {
-        current_seq = best_seq;
         lo = ee_read((uint8_t)(best_slot * RECORD_SIZE + 2U));
         hi = ee_read((uint8_t)(best_slot * RECORD_SIZE + 3U));
         current_counter = (uint16_t)lo | ((uint16_t)hi << 8);
     } else {
-        current_seq = 0;
         current_counter = initial_counter;
         eeprom_store_commit(current_counter);
     }
@@ -113,8 +111,14 @@ uint16_t eeprom_store_get(void) {
 }
 
 uint8_t eeprom_store_commit(uint16_t counter) {
-    uint8_t next_slot = (uint8_t)((current_seq + 1U) & 0x0FU);
-    uint8_t next_seq = (uint8_t)(current_seq + 1U);
+    /*
+     * The sequence number is derivable from the counter because every
+     * committed record advances the counter by exactly one.
+     *
+     * This removes one byte of persistent RAM.
+     */
+    uint8_t next_seq = (uint8_t)(counter - INITIAL_COUNTER);
+    uint8_t next_slot = (uint8_t)(next_seq & 0x0FU);
     uint8_t base = (uint8_t)(next_slot * RECORD_SIZE);
     uint8_t chk = checksum(next_seq, counter);
 
@@ -134,7 +138,6 @@ uint8_t eeprom_store_commit(uint16_t counter) {
     if(!slot_valid(next_slot))
         return 0;
 
-    current_seq = next_seq;
     current_counter = counter;
     return 1;
 }
