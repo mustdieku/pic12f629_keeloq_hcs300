@@ -159,13 +159,6 @@ void main(void) {
     uint8_t debounced;
     uint16_t counter;
 
-    /*
-     * Derive the encoder key once at startup.
-     * The resulting 64-bit key remains in the KeeLoq module's static RAM.
-     */
-    keeloq_normal_learning(SERIAL_NUMBER, MANUFACTURER_CODE_LO,
-                           MANUFACTURER_CODE_HI);
-
     io_init();
     eeprom_store_init(INITIAL_COUNTER);
     counter = eeprom_store_get();
