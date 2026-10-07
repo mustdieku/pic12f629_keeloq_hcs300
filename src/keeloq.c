@@ -4,8 +4,10 @@
 #define KEELOQ_NLF 0x3A5C742EU
 
 /*
- * Only the learned 64-bit key is kept in RAM. The manufacturer key is a
- * compile-time constant, so it does not need a second 64-bit RAM object.
+ * Only the derived 64-bit encoder key is kept in RAM.
+ *
+ * The manufacturer key is stored as compile-time constants, which avoids
+ * allocating another 64-bit object in RAM.
  */
 static uint32_t key_lo;
 static uint32_t key_hi;
@@ -14,7 +16,7 @@ static uint8_t bit32(uint32_t x, uint8_t n) {
     return (uint8_t)((x >> n) & 1U);
 }
 
-/* KeeLoq NLF lookup. The argument is the five-bit input index. */
+/* KeeLoq nonlinear feedback lookup. */
 static uint8_t nlf(uint8_t index) {
     return (uint8_t)((KEELOQ_NLF >> index) & 1U);
 }
@@ -110,15 +112,20 @@ static uint32_t decrypt_manufacturer(uint32_t data) {
 }
 
 /*
- * KeeLoq normal-learning derivation used by the HCS300 family.
- + * Only the final learned key is retained in RAM.
-*/
+ * KeeLoq normal-learning derivation used by HCS300.
+ *
+ * Normal learning decrypts two different 28-bit serial-number values:
+ *
+ *   serial | 0x20000000
+ *   serial | 0x60000000
+ *
+ * The resulting words form the 64-bit encoder key as K2:K1.
+ */
 void keeloq_normal_learning(uint32_t serial, uint32_t manufacturer_lo,
                             uint32_t manufacturer_hi) {
     uint32_t s = serial & 0x0FFFFFFFUL;
 
-    /* Arguments are retained for API compatibility; the source constants
-     * are used directly so no second 64-bit key is allocated in RAM. */
+    /* API compatibility; the compile-time constants are used directly. */
     (void)manufacturer_lo;
     (void)manufacturer_hi;
 

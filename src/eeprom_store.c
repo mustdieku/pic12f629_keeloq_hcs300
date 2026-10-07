@@ -6,11 +6,12 @@
 #define RECORD_SIZE  7U
 #define EEPROM_MAGIC 0xA5U
 
-/* Keep EEPROM state in static storage instead of the call stack. */
+/* Runtime state is kept in static storage to minimize stack usage. */
 static uint8_t current_seq;
 static uint16_t current_counter;
 
 static uint8_t ee_read(uint8_t address) {
+    EECON1bits.EEPGD = 0;
     EEADR = address;
     EECON1bits.RD = 1;
     return EEDATA;
@@ -18,15 +19,20 @@ static uint8_t ee_read(uint8_t address) {
 
 static void ee_write(uint8_t address, uint8_t value) {
     uint8_t gie = INTCONbits.GIE;
+
     while(EECON1bits.WR) { }
+
+    EECON1bits.EEPGD = 0;
     EEADR = address;
     EEDATA = value;
     EECON1bits.WREN = 1;
+
     INTCONbits.GIE = 0;
     EECON2 = 0x55;
     EECON2 = 0xAA;
     EECON1bits.WR = 1;
     EECON1bits.WREN = 0;
+
     INTCONbits.GIE = gie;
     while(EECON1bits.WR) { }
 }
@@ -38,7 +44,12 @@ static uint8_t checksum(uint8_t seq, uint16_t counter) {
     return (uint8_t)((x << 3) | (x >> 5));
 }
 
-/* Validate a slot without retaining scratch state in global RAM. */
+/*
+ * Validate one EEPROM record.
+ *
+ * The commit marker (MAGIC) is written last. Therefore an interrupted
+ * record update cannot normally become the newest valid record.
+ */
 static uint8_t slot_valid(uint8_t slot) {
     uint8_t base = (uint8_t)(slot * RECORD_SIZE);
     uint8_t seq;
@@ -51,6 +62,7 @@ static uint8_t slot_valid(uint8_t slot) {
     if(ee_read(base) != EEPROM_MAGIC) return 0;
 
     seq = ee_read((uint8_t)(base + 1U));
+
     lo = ee_read((uint8_t)(base + 2U));
     hi = ee_read((uint8_t)(base + 3U));
     ilo = ee_read((uint8_t)(base + 4U));
@@ -63,6 +75,12 @@ static uint8_t slot_valid(uint8_t slot) {
     return 1;
 }
 
+/*
+ * Compare 8-bit sequence numbers with wrap-around.
+ *
+ * This remains valid as long as the distance between two valid sequence
+ * numbers is less than 128.
+ */
 static uint8_t seq_newer(uint8_t a, uint8_t b) {
     return (uint8_t)((int8_t)(a - b) > 0);
 }
@@ -107,7 +125,12 @@ uint8_t eeprom_store_commit(uint16_t counter) {
     uint8_t base = (uint8_t)(next_slot * RECORD_SIZE);
     uint8_t chk = checksum(next_seq, counter);
 
-    /* Invalidate first; write the commit marker last. */
+    /*
+     * Invalidate first and write the commit marker last.
+     *
+     * This is the important power-failure property of the journal:
+     * an incomplete record is never accepted by slot_valid().
+     */
     ee_write(base, 0x00U);
     ee_write((uint8_t)(base + 1U), next_seq);
     ee_write((uint8_t)(base + 2U), (uint8_t)counter);
