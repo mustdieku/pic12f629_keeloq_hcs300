@@ -1,3 +1,4 @@
 .vscode/
 build/
+tests/test_keeloq
 .DS_Store

@@ -107,9 +107,9 @@ serial-number bits.
 
 ## EEPROM counter storage
 
-PIC12F629 has 128 bytes of data EEPROM. The firmware uses 16 rotating records of 7 bytes (112 bytes total):
+PIC12F629 has 128 bytes of data EEPROM. The firmware uses 16 rotating records of 5 bytes (80 bytes total):
 
-`MAGIC | SEQ | COUNTER | ~COUNTER | CHECK`
+`MAGIC | SEQ | COUNTER_LO | COUNTER_HI | CHECK`
 
 The records form a circular journal:
 

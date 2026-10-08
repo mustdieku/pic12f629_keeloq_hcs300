@@ -3,6 +3,6 @@
 
 #include <stdint.h>
 
-uint32_t keeloq_encrypt(uint32_t data);
+void keeloq_encrypt(uint8_t data[4]);
 
 #endif

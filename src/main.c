@@ -54,19 +54,26 @@ static void data_byte_lsb(uint8_t value) {
  * same rolling-code counter.
  */
 static void send_word(uint8_t button_code, uint16_t counter, uint8_t repeat) {
-    uint32_t hop;
+    uint8_t hop[4];
     uint8_t i;
 
     /*
-     * Encrypted HCS300 payload:
+     * Encrypted HCS300 payload is:
      *
      *   BUTTON[3:0] | OVR[1:0] | DISC[9:0] | COUNTER[15:0]
+     *
+     * Stored little-endian because HCS300 transmits the encrypted
+     * 32-bit result LSB first.
      */
-    hop = keeloq_encrypt(
-        ((uint32_t)(button_code & 0x0FU) << 28) |
-        ((uint32_t)(OVR_BITS & 0x03U) << 26) |
-        (DISC_VALUE << 16) |
-        counter);
+    hop[0] = (uint8_t)counter;
+    hop[1] = (uint8_t)(counter >> 8);
+    hop[2] = (uint8_t)DISC_VALUE;
+    hop[3] = (uint8_t)(
+        ((DISC_VALUE >> 8) & 0x03U) |
+        ((OVR_BITS & 0x03U) << 2) |
+        ((button_code & 0x0FU) << 4));
+
+    keeloq_encrypt(hop);
 
     /* HCS300 preamble: 23 TE of alternating high/low. */
     for(i = 0; i != 23U; ++i) {
@@ -86,29 +93,25 @@ static void send_word(uint8_t button_code, uint16_t counter, uint8_t repeat) {
      * The cipher result is represented little-endian by keeloq_encrypt(),
      * so four byte transmissions are equivalent to the previous bit loop.
      */
-    data_byte_lsb((uint8_t)hop);
-    data_byte_lsb((uint8_t)(hop >> 8));
-    data_byte_lsb((uint8_t)(hop >> 16));
-    data_byte_lsb((uint8_t)(hop >> 24));
+    data_byte_lsb(hop[0]);
+    data_byte_lsb(hop[1]);
+    data_byte_lsb(hop[2]);
+    data_byte_lsb(hop[3]);
 
     /*
      * Fixed portion, 34 bits.
      *
-     * HCS300 transmits:
-     *
-     *   SERIAL[27:0]
-     *   S3 S0 S1 S2 VLOW RPT
+     * HCS300 transmits the 28-bit serial number LSB first,
+     * followed by S3, S0, S1, S2, VLOW and RPT.
      *
      * The serial number is transmitted MSB first.
      */
-    data_bit((uint8_t)((SERIAL_NUMBER >> 27U) & 1U));
-    data_bit((uint8_t)((SERIAL_NUMBER >> 26U) & 1U));
-    data_bit((uint8_t)((SERIAL_NUMBER >> 25U) & 1U));
-    data_bit((uint8_t)((SERIAL_NUMBER >> 24U) & 1U));
-
-    data_byte_lsb((uint8_t)(SERIAL_NUMBER >> 16));
-    data_byte_lsb((uint8_t)(SERIAL_NUMBER >> 8));
     data_byte_lsb((uint8_t)SERIAL_NUMBER);
+    data_byte_lsb((uint8_t)(SERIAL_NUMBER >> 8));
+    data_byte_lsb((uint8_t)(SERIAL_NUMBER >> 16));
+
+    for(i = 0; i < 4U; ++i)
+        data_bit((uint8_t)((SERIAL_NUMBER >> (24U + i)) & 1U));
 
     data_bit((uint8_t)((button_code >> 3) & 1U)); /* S3 */
     data_bit((uint8_t)(button_code & 1U));         /* S0 */
