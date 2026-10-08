@@ -22,8 +22,8 @@
 /*
  * HCS300 button codes.
  *
- * GP1 -> 0x2
- * GP0 -> 0x8
+ * GP1 (pin 6) -> 0x2, active-low
+ * GP0 (pin 7) -> 0x8, active-low
  * both -> 0xA
  */
 #define BUTTON1_CODE 0x2U

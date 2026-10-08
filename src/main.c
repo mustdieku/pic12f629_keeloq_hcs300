@@ -133,12 +133,14 @@ static void send_word(uint8_t button_code, uint16_t counter, uint8_t repeat) {
  *   0x2 - button 1
  *   0x8 - button 2
  *   0xA - both buttons
+ *
+ * Buttons are active-low and use the PIC12F629 internal weak pull-ups.
  */
 static uint8_t read_buttons(void) {
     uint8_t v = 0;
 
-    if(GPIO & BUTTON1_MASK) v |= BUTTON1_CODE;
-    if(GPIO & BUTTON2_MASK) v |= BUTTON2_CODE;
+    if(!(GPIO & BUTTON1_MASK)) v |= BUTTON1_CODE;
+    if(!(GPIO & BUTTON2_MASK)) v |= BUTTON2_CODE;
 
     return v;
 }
@@ -168,9 +170,17 @@ static void io_init(void) {
     /* Disable the comparator so GP0/GP1 are digital inputs. */
     CMCON = 0x07;
 
-    /* Buttons use external pull resistors. */
-    WPU = 0x00;
-    OPTION_REGbits.nGPPU = 1;
+    /*
+     * Enable the PORTA/GP weak pull-ups.
+     *
+     * PIC12F629 uses active-low global pull-up enable:
+     *   nGPPU = 0 -> weak pull-ups enabled
+     *   nGPPU = 1 -> weak pull-ups disabled
+     *
+     * WPU bits are enabled only for GP0 and GP1, the two button inputs.
+     */
+    WPU = (BUTTON1_MASK | BUTTON2_MASK);
+    OPTION_REGbits.nGPPU = 0;
 }
 
 void main(void) {
