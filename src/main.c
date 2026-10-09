@@ -33,9 +33,9 @@ static void delay_te(uint8_t n) {
 
 static void data_bit(uint8_t bit) {
     GPIO |= DATA_MASK;
-    delay_te(bit ? 2U : 1U);
-    GPIO &= (uint8_t)~DATA_MASK;
     delay_te(bit ? 1U : 2U);
+    GPIO &= (uint8_t)~DATA_MASK;
+    delay_te(bit ? 2U : 1U);
 }
 
 static void data_byte_lsb(uint8_t value) {
@@ -75,8 +75,8 @@ static void send_word(uint8_t button_code, uint16_t counter, uint8_t repeat) {
 
     keeloq_encrypt(hop);
 
-    /* HCS300 preamble: 23 TE of alternating high/low. */
-    for(i = 0; i != 23U; ++i) {
+    /* KeeLoq preamble: 12 alternating HIGH/LOW pairs. */
+    for(i = 0; i != 12U; ++i) {
         GPIO |= DATA_MASK;
         __delay_us(TE_US);
         GPIO &= (uint8_t)~DATA_MASK;
@@ -103,15 +103,12 @@ static void send_word(uint8_t button_code, uint16_t counter, uint8_t repeat) {
      *
      * HCS300 transmits the 28-bit serial number LSB first,
      * followed by S3, S0, S1, S2, VLOW and RPT.
-     *
-     * The serial number is transmitted MSB first.
      */
-    data_byte_lsb((uint8_t)SERIAL_NUMBER);
-    data_byte_lsb((uint8_t)(SERIAL_NUMBER >> 8));
-    data_byte_lsb((uint8_t)(SERIAL_NUMBER >> 16));
-
-    for(i = 0; i < 4U; ++i)
-        data_bit((uint8_t)((SERIAL_NUMBER >> (24U + i)) & 1U));
+    /*
+     * Send all 28 serial-number bits LSB first.
+     */
+    for(i = 0; i < 28U; ++i)
+        data_bit((uint8_t)((SERIAL_NUMBER >> i) & 1U));
 
     data_bit((uint8_t)((button_code >> 3) & 1U)); /* S3 */
     data_bit((uint8_t)(button_code & 1U));         /* S0 */
@@ -120,9 +117,11 @@ static void send_word(uint8_t button_code, uint16_t counter, uint8_t repeat) {
     data_bit(VLOW_BIT);
     data_bit(repeat ? 1U : 0U); /* RPT */
 
-    /* Inter-word guard interval. */
+    /* Trailing pulse and inter-word guard interval. */
+    GPIO |= DATA_MASK;
+    delay_te(1U);
     GPIO &= (uint8_t)~DATA_MASK;
-    delay_te(39U);
+    delay_te(40U);
 }
 
 /*
