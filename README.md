@@ -70,7 +70,7 @@ button 2 pressed
 ## KeeLoq / HCS300 format
 
 The firmware uses the standard 528-round KeeLoq block cipher with NLF `0x3A5C742E`.
-For normal learning, the 64-bit encoder key is derived from the 28-bit serial number and the 64-bit manufacturer code using the standard two-decryption construction used by the referenced Unleashed firmware.
+This firmware uses Simple Learning. The 64-bit manufacturer code is used directly as the KeeLoq encryption key. No Normal Learning key derivation is performed.
 
 The encrypted 32-bit input is:
 
@@ -90,7 +90,7 @@ The fixed 34-bit field contains the 28-bit serial number followed by:
 
 Data is emitted in HCS300 order.
 
-PWM uses `TE = 400 us`, 23 TE preamble, 10 TE header and a 39 TE guard interval. A logic 0 is encoded as 1 TE high + 2 TE low; a logic 1 as 2 TE high + 1 TE low.
+PWM uses `TE = 400 us`, a 23 TE HIGH 50% duty cycle preamble, a 10 TE LOW header and a guard interval after each word. A logic 0 is encoded as 2 TE HIGH + 1 TE LOW; a logic 1 as 1 TE HIGH + 2 TE LOW.
 
 ## Configuration
 

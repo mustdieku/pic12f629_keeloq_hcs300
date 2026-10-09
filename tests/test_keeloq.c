@@ -58,6 +58,24 @@ int main(void) {
         assert(memcmp(data_8, data, sizeof(data_8)) != 0);
     }
 
+    /*
+     * Regression vector for the actual config.h values:
+     *
+     * serial       = 0x01234567
+     * DISC         = 0x167
+     * button       = 0x2
+     * first counter after a clean EEPROM initialization = 0x0001
+     * OVR          = 0
+     * plaintext    = 0x21670001
+     * manufacturer key = 0x0123456789ABCDEF
+     */
+    {
+        uint8_t configured[4];
+        u32_to_bytes(0x21670001UL, configured);
+        keeloq_encrypt(configured);
+        assert(bytes_to_u32(configured) == 0x08EE9FC6UL);
+    }
+
     printf("KeeLoq tests passed\n");
     return 0;
 }
