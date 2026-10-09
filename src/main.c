@@ -75,15 +75,17 @@ static void send_word(uint8_t button_code, uint16_t counter, uint8_t repeat) {
 
     keeloq_encrypt(hop);
 
-    /* KeeLoq preamble: 12 alternating HIGH/LOW pairs. */
-    for(i = 0; i != 12U; ++i) {
+    /* KeeLoq preamble: 11 HIGH/LOW pairs, then one short HIGH. */
+    for(i = 0; i != 11U; ++i) {
         GPIO |= DATA_MASK;
         __delay_us(TE_US);
         GPIO &= (uint8_t)~DATA_MASK;
         __delay_us(TE_US);
     }
 
-    /* Header: 10 TE low. */
+    /* Final short HIGH pulse, then 10 TE LOW header. */
+    GPIO |= DATA_MASK;
+    delay_te(1U);
     GPIO &= (uint8_t)~DATA_MASK;
     delay_te(10U);
 
